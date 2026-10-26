@@ -1,10 +1,10 @@
 {
   "churchName": "온맘교회",
-  "logo": "uploads/onmam-logo-current.png",
+  "logo": "/uploads/onmam-logo-current.png",
   "hero": {
     "title": "함께 예배하고,\n함께 살아가는\n온맘교회",
     "description": "말씀 안에서 자라고,\n사랑으로 이웃을 섬기는 공동체.\n처음 오신 당신을 따뜻하게 환영합니다.",
-    "image": "uploads/hero-current.jpg",
+    "image": "/uploads/hero-current.jpg",
     "imageAlt": "임시 예배당 사진"
   },
   "worship": {
