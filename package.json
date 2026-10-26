@@ -4,14 +4,18 @@
   "private": true,
   "description": "온맘교회 홈페이지 콘텐츠 관리",
   "scripts": {
-    "cms": "tinacms dev -c \"npx serve . -l 3000\"",
-    "build": "tinacms build"
+    "start": "node scripts/server.mjs",
+    "dev": "node --watch scripts/server.mjs",
+    "cms": "tinacms dev -c \"node scripts/server.mjs --local\"",
+    "build": "tinacms build",
+    "test": "node --test tests/*.test.mjs"
   },
+  "engines": { "node": ">=22" },
   "dependencies": {
-    "tinacms": "^2.0.0"
+    "tinacms": "^3.15.0"
   },
   "devDependencies": {
-    "@tinacms/cli": "^1.6.0",
+    "@tinacms/cli": "^4.0.3",
     "@types/node": "^22.7.5",
     "serve": "^14.2.4"
   }

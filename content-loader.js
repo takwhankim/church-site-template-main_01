@@ -1,4 +1,8 @@
-(async function loadOnmamContent() {
+(function loadOnmamContent() {
+  let assetBase = "/uploads/";
+  let revision = "";
+  let lastContent = "";
+  let loading = false;
   const safeText = (value) => String(value ?? "");
   const setText = (selector, value) => {
     const node = document.querySelector(selector);
@@ -24,21 +28,36 @@
     if (!raw) return "";
     const lower = raw.toLowerCase();
     if (lower.startsWith("http://") || lower.startsWith("https://") || raw.startsWith("//")) return safeUrl(raw);
+    if (/^[a-z][a-z\d+.-]*:/i.test(raw) || raw.includes("\\")) return "";
     let relative = raw;
     while (relative.startsWith("/")) relative = relative.slice(1);
     if (relative.toLowerCase().startsWith("uploads/")) relative = relative.slice("uploads/".length);
-    return safeUrl("/uploads/" + relative);
+    if (relative.split("/").includes("..")) return "";
+    const url = new URL(relative, new URL(assetBase, window.location.href));
+    if (revision && url.origin === window.location.origin) url.searchParams.set("v", revision);
+    return safeUrl(url.href);
   };
   const setImage = (node, value, alt) => {
     const url = safeImageUrl(value);
-    if (!node || !url) return false;
+    if (!node || value === undefined) return false;
+    if (!url) {
+      node.hidden = true;
+      node.removeAttribute("src");
+      return false;
+    }
+    node.hidden = false;
     node.src = url;
     if (alt !== undefined && alt !== null) node.alt = safeText(alt);
     return true;
   };
   const openExternal = (button, value) => {
     const url = safeUrl(value);
-    if (!button || !url) return false;
+    if (!button) return false;
+    button.onclick = null;
+    if (!url) {
+      button.disabled = true;
+      return false;
+    }
     button.removeAttribute("data-info");
     button.removeAttribute("disabled");
     button.onclick = (event) => {
@@ -48,14 +67,21 @@
     return true;
   };
 
-  try {
-    const response = await fetch("./content/site.json", { cache: "no-store" });
-    if (!response.ok) return;
-    const data = await response.json();
-
+  function renderContent(data) {
     if (data.churchName) document.title = safeText(data.churchName) + " | 교회 홈페이지";
     const logoAlt = data.churchName ? safeText(data.churchName) + " 로고" : "교회 로고";
-    document.querySelectorAll(".custom-logo").forEach((logo) => setImage(logo, data.logo, logoAlt));
+    document.querySelectorAll(".custom-logo").forEach((logo) => {
+      const hasLogo = setImage(logo, data.logo, logoAlt);
+      let fallback = logo.parentElement.querySelector("[data-logo-fallback]");
+      if (!fallback) {
+        fallback = document.createElement("span");
+        fallback.dataset.logoFallback = "";
+        logo.parentElement.appendChild(fallback);
+      }
+      fallback.textContent = safeText(data.churchName || "교회");
+      fallback.hidden = hasLogo || data.logo === undefined;
+      logo.parentElement.setAttribute("aria-label", logoAlt);
+    });
     setImage(document.querySelector(".hero-image"), data.hero?.image, data.hero?.imageAlt || "온맘교회 예배당");
     setLines(".hero h1", data.hero?.title);
     setLines(".hero .lead", data.hero?.description);
@@ -118,7 +144,7 @@
       const imageDialog = document.getElementById("blog-image-dialog");
       const fullImage = document.getElementById("blog-full-image");
       const imageCaption = document.getElementById("blog-image-caption");
-      cardsContainer.addEventListener("click", (event) => {
+      cardsContainer.onclick = (event) => {
         const card = event.target.closest("[data-cms-post-index]");
         if (!card || !detailDialog || !detailContent) return;
         const index = Number(card.dataset.cmsPostIndex);
@@ -131,8 +157,8 @@
         const coverMarkup = cover ? '<button type="button" data-cms-photo-index="0" style="padding:0;border:0;background:none;width:100%;cursor:zoom-in" aria-label="대표사진 크게 보기"><img class="blog-detail-cover" src="' + escapeAttr(cover.src) + '" alt="' + escapeAttr(cover.alt) + '"></button>' : '';
         detailContent.innerHTML = '<div class="blog-detail-meta"><span>' + escapeHtml(post.category || "교회소식") + '</span><span>' + escapeHtml(post.author || "온맘교회") + '</span><span>' + escapeHtml(post.dateLabel || "") + '</span></div><h2 id="blog-detail-title">' + escapeHtml(post.title || "") + '</h2>' + coverMarkup + '<div class="blog-detail-body">' + escapeHtml(post.excerpt || "").replace(/\n/g, "<br>") + '</div>' + galleryMarkup;
         if (typeof detailDialog.showModal === "function") detailDialog.showModal();
-      });
-      detailContent?.addEventListener("click", (event) => {
+      };
+      if (detailContent) detailContent.onclick = (event) => {
         const photoButton = event.target.closest("[data-cms-photo-index]");
         if (!photoButton || !imageDialog || !fullImage) return;
         const postIndex = Number(detailDialog?.dataset.cmsPostIndex);
@@ -142,7 +168,7 @@
         fullImage.alt = photo.alt;
         if (imageCaption) imageCaption.textContent = photo.alt;
         if (typeof imageDialog.showModal === "function") imageDialog.showModal();
-      });
+      };
     }
 
     setText("#bulletin h3", data.bulletin?.title);
@@ -183,9 +209,41 @@
       });
       choices.slice((data.chatbot?.choices || []).length).forEach((button) => { button.hidden = true; });
     }
-  } catch (error) {
-    console.warn("온맘교회 콘텐츠 파일을 불러오지 못했습니다.", error);
   }
+
+  async function refreshContent() {
+    if (loading || document.hidden) return;
+    loading = true;
+    try {
+      const response = await fetch("./content/site.json", { cache: "no-store", signal: AbortSignal.timeout(30_000) });
+      if (!response.ok) throw new Error("콘텐츠 요청 실패: " + response.status);
+      const data = await response.json();
+      if (!data || typeof data !== "object" || typeof data.churchName !== "string") throw new Error("올바른 홈페이지 콘텐츠가 아닙니다.");
+      const content = JSON.stringify(data);
+      if (content === lastContent || document.querySelector("dialog[open]")) return;
+      assetBase = data._onmam?.assetBase || "/uploads/";
+      revision = data._onmam?.revision || "";
+      renderContent(data);
+      lastContent = content;
+      document.documentElement.dataset.contentSource = data._onmam?.source || "local";
+      window.dispatchEvent(new CustomEvent("onmam:content-updated", { detail: { revision, source: data._onmam?.source || "local" } }));
+    } catch (error) {
+      console.warn("온맘교회 콘텐츠를 갱신하지 못했습니다. 기존 화면을 유지합니다.", error);
+    } finally {
+      loading = false;
+    }
+  }
+  refreshContent();
+  document.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-blog-close]");
+    if (!button) return;
+    const dialog = document.getElementById(button.dataset.blogClose);
+    if (dialog instanceof HTMLDialogElement) dialog.close();
+  });
+  window.addEventListener("focus", refreshContent);
+  document.addEventListener("visibilitychange", () => { if (!document.hidden) refreshContent(); });
+  document.querySelectorAll("dialog").forEach((dialog) => dialog.addEventListener("close", refreshContent));
+  window.setInterval(refreshContent, 15_000);
 
   function setTextWithin(parent, selector, value) {
     const node = parent.querySelector(selector);

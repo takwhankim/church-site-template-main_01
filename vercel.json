@@ -1,0 +1,22 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": null,
+  "buildCommand": "node scripts/build-preview.mjs",
+  "installCommand": "echo 'Using the checked-in admin build'",
+  "outputDirectory": "dist",
+  "functions": {
+    "api/content.mjs": {
+      "includeFiles": "content/site.json",
+      "maxDuration": 30
+    }
+  },
+  "rewrites": [
+    { "source": "/content/site.json", "destination": "/api/content" }
+  ],
+  "headers": [
+    {
+      "source": "/content/site.json",
+      "headers": [{ "key": "Cache-Control", "value": "no-store" }]
+    }
+  ]
+}
