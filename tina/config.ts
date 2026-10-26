@@ -26,10 +26,13 @@ export default defineConfig({
         },
         fields: [
           { type: "string", name: "churchName", label: "교회 이름", required: true },
+          { type: "image", name: "logo", label: "홈페이지 로고 (헤더·푸터)" },
           {
             type: "object", name: "hero", label: "첫 화면", fields: [
               { type: "string", name: "title", label: "메인 문구", ui: { component: "textarea" } },
               { type: "string", name: "description", label: "소개 문구", ui: { component: "textarea" } },
+              { type: "image", name: "image", label: "히어로 이미지" },
+              { type: "string", name: "imageAlt", label: "히어로 이미지 설명" },
             ],
           },
           {
@@ -68,6 +71,11 @@ export default defineConfig({
                 { type: "string", name: "excerpt", label: "본문/요약", ui: { component: "textarea" } },
                 { type: "string", name: "author", label: "작성자" },
                 { type: "image", name: "image", label: "대표 사진" },
+                { type: "string", name: "imageAlt", label: "대표 사진 설명" },
+                { type: "object", name: "gallery", label: "추가 사진 갤러리", list: true, fields: [
+                  { type: "image", name: "image", label: "사진" },
+                  { type: "string", name: "alt", label: "사진 설명" },
+                ] },
               ] },
             ],
           },
