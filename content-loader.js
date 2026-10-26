@@ -19,6 +19,13 @@
       return "";
     }
   };
+  const setImage = (node, value, alt) => {
+    const url = safeUrl(value);
+    if (!node || !url) return false;
+    node.src = url;
+    if (alt !== undefined && alt !== null) node.alt = safeText(alt);
+    return true;
+  };
   const openExternal = (button, value) => {
     const url = safeUrl(value);
     if (!button || !url) return false;
@@ -37,6 +44,9 @@
     const data = await response.json();
 
     if (data.churchName) document.title = safeText(data.churchName) + " | 교회 홈페이지";
+    const logoAlt = data.churchName ? safeText(data.churchName) + " 로고" : "교회 로고";
+    document.querySelectorAll(".custom-logo").forEach((logo) => setImage(logo, data.logo, logoAlt));
+    setImage(document.querySelector(".hero-image"), data.hero?.image, data.hero?.imageAlt || "온맘교회 예배당");
     setLines(".hero h1", data.hero?.title);
     setLines(".hero .lead", data.hero?.description);
 
@@ -74,15 +84,54 @@
     community?.querySelector(".board-status")?.setAttribute("hidden", "");
     community?.querySelector(".section-head button")?.setAttribute("hidden", "");
     const cardsContainer = document.querySelector("#community .board-cards");
+    const communityPosts = Array.isArray(data.community?.posts) ? data.community.posts : [];
+    const postPhotos = communityPosts.map((post) => {
+      const cover = safeUrl(post.image) ? [{ src: safeUrl(post.image), alt: post.imageAlt || post.title || "온맘교회 소식" }] : [];
+      const gallery = Array.isArray(post.gallery) ? post.gallery.map((item) => {
+        const src = safeUrl(item?.image);
+        return src ? { src, alt: item?.alt || post.title || "온맘교회 사진" } : null;
+      }).filter(Boolean) : [];
+      return [...cover, ...gallery];
+    });
     if (cardsContainer && Array.isArray(data.community?.posts)) {
-      const fallbacks = [...cardsContainer.querySelectorAll(".blog-card img")].map((image) => image.src);
-      cardsContainer.innerHTML = data.community.posts.map((post, index) => {
-        const imageUrl = safeUrl(post.image) || fallbacks[index] || "";
-        const imageMarkup = imageUrl
-          ? '<div class="blog-card-media"><img src="' + escapeAttr(imageUrl) + '" alt="' + escapeAttr(post.title || "온맘교회 소식") + '" loading="lazy"></div>'
+      cardsContainer.innerHTML = communityPosts.map((post, index) => {
+        const photos = postPhotos[index];
+        const cover = photos[0];
+        const imageMarkup = cover
+          ? '<div class="blog-card-media"><img src="' + escapeAttr(cover.src) + '" alt="' + escapeAttr(cover.alt) + '" loading="lazy">' + (photos.length ? '<span class="blog-count">사진 ' + photos.length + '장</span>' : '') + '</div>'
           : '<div class="blog-card-media"><div class="blog-no-image">OUR STORIES</div></div>';
-        return '<article class="blog-card"><div class="blog-card-button">' + imageMarkup + '<div class="blog-card-meta"><span class="blog-card-tag">' + escapeHtml(post.category || "교회소식") + '</span><span>' + escapeHtml(post.dateLabel || "") + '</span></div><h3>' + escapeHtml(post.title || "") + '</h3><p>' + escapeHtml(post.excerpt || "") + '</p><div class="blog-card-footer"><span>' + escapeHtml(post.author || "온맘교회") + '</span><span>이야기</span></div></div></article>';
+        return '<article class="blog-card"><button class="blog-card-button" type="button" data-cms-post-index="' + index + '" aria-label="' + escapeAttr(post.title || "온맘교회 소식") + ' 글 보기">' + imageMarkup + '<div class="blog-card-meta"><span class="blog-card-tag">' + escapeHtml(post.category || "교회소식") + '</span><span>' + escapeHtml(post.dateLabel || "") + '</span></div><h3>' + escapeHtml(post.title || "") + '</h3><p>' + escapeHtml(post.excerpt || "") + '</p><div class="blog-card-footer"><span>' + escapeHtml(post.author || "온맘교회") + '</span><span>이야기</span></div></button></article>';
       }).join("");
+      const detailDialog = document.getElementById("blog-detail-dialog");
+      const detailContent = document.getElementById("blog-detail-content");
+      const imageDialog = document.getElementById("blog-image-dialog");
+      const fullImage = document.getElementById("blog-full-image");
+      const imageCaption = document.getElementById("blog-image-caption");
+      cardsContainer.addEventListener("click", (event) => {
+        const card = event.target.closest("[data-cms-post-index]");
+        if (!card || !detailDialog || !detailContent) return;
+        const index = Number(card.dataset.cmsPostIndex);
+        const post = communityPosts[index];
+        const photos = postPhotos[index] || [];
+        if (!post) return;
+        detailDialog.dataset.cmsPostIndex = String(index);
+        const cover = photos[0];
+        const galleryMarkup = photos.length > 1 ? '<div class="blog-gallery">' + photos.slice(1).map((photo, offset) => '<figure><button type="button" data-cms-photo-index="' + (offset + 1) + '" aria-label="사진 ' + (offset + 2) + ' 크게 보기"><img src="' + escapeAttr(photo.src) + '" alt="' + escapeAttr(photo.alt) + '" loading="lazy"></button><figcaption>' + escapeHtml(photo.alt || ('사진 ' + (offset + 2))) + '</figcaption></figure>').join("") + '</div>' : '';
+        const coverMarkup = cover ? '<button type="button" data-cms-photo-index="0" style="padding:0;border:0;background:none;width:100%;cursor:zoom-in" aria-label="대표사진 크게 보기"><img class="blog-detail-cover" src="' + escapeAttr(cover.src) + '" alt="' + escapeAttr(cover.alt) + '"></button>' : '';
+        detailContent.innerHTML = '<div class="blog-detail-meta"><span>' + escapeHtml(post.category || "교회소식") + '</span><span>' + escapeHtml(post.author || "온맘교회") + '</span><span>' + escapeHtml(post.dateLabel || "") + '</span></div><h2 id="blog-detail-title">' + escapeHtml(post.title || "") + '</h2>' + coverMarkup + '<div class="blog-detail-body">' + escapeHtml(post.excerpt || "").replace(/\n/g, "<br>") + '</div>' + galleryMarkup;
+        if (typeof detailDialog.showModal === "function") detailDialog.showModal();
+      });
+      detailContent?.addEventListener("click", (event) => {
+        const photoButton = event.target.closest("[data-cms-photo-index]");
+        if (!photoButton || !imageDialog || !fullImage) return;
+        const postIndex = Number(detailDialog?.dataset.cmsPostIndex);
+        const photo = postPhotos[postIndex]?.[Number(photoButton.dataset.cmsPhotoIndex)];
+        if (!photo) return;
+        fullImage.src = photo.src;
+        fullImage.alt = photo.alt;
+        if (imageCaption) imageCaption.textContent = photo.alt;
+        if (typeof imageDialog.showModal === "function") imageDialog.showModal();
+      });
     }
 
     setText("#bulletin h3", data.bulletin?.title);
