@@ -1,0 +1,18 @@
+{
+  "name": "onmam-church-site",
+  "version": "1.0.0",
+  "private": true,
+  "description": "온맘교회 홈페이지 콘텐츠 관리",
+  "scripts": {
+    "cms": "tinacms dev -c \"npx serve . -l 3000\"",
+    "build": "tinacms build"
+  },
+  "dependencies": {
+    "tinacms": "^2.0.0"
+  },
+  "devDependencies": {
+    "@tinacms/cli": "^1.6.0",
+    "@types/node": "^22.7.5",
+    "serve": "^14.2.4"
+  }
+}
