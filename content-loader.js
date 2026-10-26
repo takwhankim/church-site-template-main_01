@@ -19,8 +19,18 @@
       return "";
     }
   };
+  const safeImageUrl = (value) => {
+    const raw = safeText(value).trim();
+    if (!raw) return "";
+    const lower = raw.toLowerCase();
+    if (lower.startsWith("http://") || lower.startsWith("https://") || raw.startsWith("//")) return safeUrl(raw);
+    let relative = raw;
+    while (relative.startsWith("/")) relative = relative.slice(1);
+    if (relative.toLowerCase().startsWith("uploads/")) relative = relative.slice("uploads/".length);
+    return safeUrl("/uploads/" + relative);
+  };
   const setImage = (node, value, alt) => {
-    const url = safeUrl(value);
+    const url = safeImageUrl(value);
     if (!node || !url) return false;
     node.src = url;
     if (alt !== undefined && alt !== null) node.alt = safeText(alt);
@@ -86,9 +96,10 @@
     const cardsContainer = document.querySelector("#community .board-cards");
     const communityPosts = Array.isArray(data.community?.posts) ? data.community.posts : [];
     const postPhotos = communityPosts.map((post) => {
-      const cover = safeUrl(post.image) ? [{ src: safeUrl(post.image), alt: post.imageAlt || post.title || "온맘교회 소식" }] : [];
+      const coverUrl = safeImageUrl(post.image);
+      const cover = coverUrl ? [{ src: coverUrl, alt: post.imageAlt || post.title || "온맘교회 소식" }] : [];
       const gallery = Array.isArray(post.gallery) ? post.gallery.map((item) => {
-        const src = safeUrl(item?.image);
+        const src = safeImageUrl(item?.image);
         return src ? { src, alt: item?.alt || post.title || "온맘교회 사진" } : null;
       }).filter(Boolean) : [];
       return [...cover, ...gallery];
